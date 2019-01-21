@@ -83,7 +83,6 @@ program
                 }
 
                 var parts = fileName.split('/');
-                console.log(parts);
                 // Check for invalid fileName, likely due to data stream exceeding buffer size resulting in incomplete string
                 // TODO: need a way to ensure that full fileNames are processed - increase buffer size??
                 if (parts[2] === undefined) {
