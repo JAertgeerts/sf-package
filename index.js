@@ -19,6 +19,7 @@ var util = require('util'),
     packageWriter = require('./lib/metaUtils').packageWriter,
     buildPackageDir = require('./lib/metaUtils').buildPackageDir,
     copyFiles = require('./lib/metaUtils').copyFiles,
+    fs = require('fs'),
     packageVersion = require('./package.json').version;
 
 
@@ -26,7 +27,6 @@ program
     .arguments('<compare> <branch> [target]')
     .version(packageVersion)
     .option('-d, --dryrun', 'Only print the package.xml and destructiveChanges.xml that would be generated')
-    .option('-p, --pversion [version]', 'Salesforce version of the package.xml', parseInt)
     .action(function (compare, branch, target) {
 
         if (!branch || !compare) {
@@ -65,12 +65,14 @@ program
         var deletesHaveOccurred = false;
 
         fileList = gitDiffStdOut.split('\n');
-        fileList.forEach(function (fileName, index) {
+        fileList.forEach(function (gitDiffLine, index) {
 
             // get the git operation
-            var operation = fileName.slice(0,1);
-            // remove the operation and spaces from fileName
-            fileName = fileName.slice(1).trim();
+            var operation = gitDiffLine.slice(0,1);
+            // separate the giDiffLine into its various components
+            var gitDiffLineParts = gitDiffLine.split('\t');
+
+            var fileName = gitDiffLineParts[gitDiffLineParts.length -1];
 
             //ensure file is inside of src directory of project
             if (fileName && fileName.substring(0,3) === 'src') {
@@ -98,17 +100,33 @@ program
                     meta = parts[2].split('.')[0].replace('-meta', '');
                 }
 
-                if (operation === 'A' || operation === 'M') {
+                if (operation === 'A' || operation === 'M' || operation === 'R') {
                     // file was added or modified - add fileName to array for unpackaged and to be copied
-                    console.log('File was added or modified: %s', fileName);
-                    fileListForCopy.push(fileName);
+                    // ant migration tool requires the whole lightning bundle to be included, even if only
+                    // one of the bundle components change.
+                    if (parts[1] === 'aura') {
+                        var bundle = fs.readdirSync(parts[0]+'/'+parts[1]+'/'+parts[2]);
+                        console.log('File was added or modified in a lightning bundle: %s', fileName);
+                        bundle.forEach(function (fileName, index) {
+                            fileListForCopy.push(parts[0]+'/'+parts[1]+'/'+parts[2]+'/'+fileName);
+                        });
+                    } else {                        
+                        console.log('File was added or modified: %s', fileName);
+                        fileListForCopy.push(fileName);
+                    }
 
                     if (!metaBag.hasOwnProperty(parts[1])) {
                         metaBag[parts[1]] = [];
                     }
 
-                    if (metaBag[parts[1]].indexOf(meta) === -1) {
-                        metaBag[parts[1]].push(meta);
+                    if (parts[1] === 'aura') {
+                        if (metaBag[parts[1]].indexOf('*') === -1) {
+                            metaBag[parts[1]].push('*');
+                        }
+                    } else {
+                        if (metaBag[parts[1]].indexOf(meta) === -1) {
+                            metaBag[parts[1]].push(meta);
+                        }
                     }
                 } else if (operation === 'D') {
                     // file was deleted
@@ -130,9 +148,9 @@ program
         });
 
         //build package file content
-        var packageXML = packageWriter(metaBag, program.pversion);
+        var packageXML = packageWriter(metaBag);
         //build destructiveChanges file content
-        var destructiveXML = packageWriter(metaBagDestructive, program.pversion);
+        var destructiveXML = packageWriter(metaBagDestructive);
         if (dryrun) {
             console.log('\npackage.xml\n');
             console.log(packageXML);
