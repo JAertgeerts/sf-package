@@ -83,6 +83,7 @@ program
                 }
 
                 var parts = fileName.split('/');
+                console.log(parts);
                 // Check for invalid fileName, likely due to data stream exceeding buffer size resulting in incomplete string
                 // TODO: need a way to ensure that full fileNames are processed - increase buffer size??
                 if (parts[2] === undefined) {
@@ -110,7 +111,7 @@ program
                         bundle.forEach(function (fileName, index) {
                             fileListForCopy.push(parts[0]+'/'+parts[1]+'/'+parts[2]+'/'+fileName);
                         });
-                    } else {                        
+                    } else {
                         console.log('File was added or modified: %s', fileName);
                         fileListForCopy.push(fileName);
                     }
@@ -123,6 +124,9 @@ program
                         if (metaBag[parts[1]].indexOf('*') === -1) {
                             metaBag[parts[1]].push('*');
                         }
+                    } else if (parts[1] === 'customMetadata') {
+                        var cmeta = parts[2].split('.')[0] + '.' + parts[2].split('.')[1];
+                        metaBag[parts[1]].push(cmeta);
                     } else {
                         if (metaBag[parts[1]].indexOf(meta) === -1) {
                             metaBag[parts[1]].push(meta);
